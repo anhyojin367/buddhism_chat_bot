@@ -15,19 +15,25 @@ from langchain.schema import Document, HumanMessage, AIMessage, SystemMessage
 # 기본 설정
 # ======================
 st.set_page_config(page_title="불교 챗봇", layout="wide")
-st.title("불교학술원")
+st.title("불교챗봇")
 
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"] # ▶︎ 운영시 환경변수 권장
 genai.configure(api_key=GOOGLE_API_KEY)
 
-LLM_MODEL = "models/gemini-2.0-flash"
+LLM_MODEL = "gemini-2.0-flash"
 EMBEDDING_MODEL = "models/text-embedding-004"
 
 # 현재 스크립트 파일의 디렉토리를 기준으로 상대 경로 설정
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 경로
-JSON_PATH_MAIN      = os.path.join(BASE_DIR, "bdc_ids3.json")
+# 경로 (✨ 수정된 부분)
+# 데이터로 사용할 JSON 파일 목록을 여기에 추가합니다.
+JSON_PATHS = [
+    os.path.join(BASE_DIR, "abc_bj_combined_llm.json"),
+    os.path.join(BASE_DIR, "간화결의론.json"),
+    os.path.join(BASE_DIR, "bdc_ids3.json"),
+    # 다른 파일이 있다면 여기에 계속 추가하세요. 예: os.path.join(BASE_DIR, "another_file.json")
+]
 JSON_PATH_GLOSSARY  = os.path.join(BASE_DIR, "bdword_structured.json")
 AUX_DOC_PATH        = os.path.join(BASE_DIR, "meta_sheet", "문헌정보.json") # meta_sheet 폴더 안의 파일
 AUX_PERSON_PATH     = os.path.join(BASE_DIR, "meta_sheet", "인물정보.json") # meta_sheet 폴더 안의 파일
@@ -237,7 +243,11 @@ def load_corpus_and_index():
     doc_map, person_map = load_aux_maps()
     alias_records = build_alias_patterns(doc_map, person_map)
 
-    rows = _safe_load_json(JSON_PATH_MAIN)
+    # ✨ 여러 JSON 파일을 읽어 하나로 합치기 (수정된 부분)
+    all_rows = []
+    for path in JSON_PATHS:
+        all_rows.extend(_safe_load_json(path))
+    rows = all_rows # 기존 변수명 'rows'를 그대로 사용
 
     docs: List[Document] = []
     for r in rows:
@@ -508,8 +518,6 @@ if q:
                         d = docs[i]
                         meta_lines = meta_briefs_for(d, doc_map, person_map, max_n=3)
                         meta_block = (" [관련 메타] " + " / ".join(meta_lines)) if meta_lines else ""
-                        # 자동연결 증거를 보고 싶다면 아래 줄을 주석 해제
-                        # debug_block = " [autolink] " + " || ".join(d.metadata.get("autolink_evidence", []))
                         context_parts.append(d.page_content + meta_block)
 
                     # 용어 보강은 1순위 본문 기준
@@ -563,4 +571,3 @@ if q:
 
             except Exception as e:
                 st.error(f"❌ 오류: {e}")
-
